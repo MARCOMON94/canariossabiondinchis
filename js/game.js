@@ -1,67 +1,42 @@
 // js/game.js
+window.routeByPhase = function routeByPhase() {
+  const room = window.STATE.room;
+  if (!room) return;
+
+  if (room.phase === "LOBBY") window.setView("LOBBY");
+  if (room.phase === "QUESTION") window.setView("QUESTION");
+  if (room.phase === "REVEAL") window.setView("REVEAL");
+};
+
 window.getTimeLeftMs = function getTimeLeftMs() {
-  const t = window.STATE.timer;
-  if (!t.running || !t.startAt) return t.durationMs;
-  const elapsed = Date.now() - t.startAt;
-  return t.durationMs - elapsed;
+  const room = window.STATE.room;
+  if (!room || room.phase !== "QUESTION" || !room.questionStartAt) return 0;
+  const startMs = room.questionStartAt.toMillis();
+  const elapsed = window.nowServerMs() - startMs;
+  return Math.max(0, room.durationMs - elapsed);
 };
 
-window.startQuestionTimer = function startQuestionTimer() {
-  const t = window.STATE.timer;
-  t.running = true;
-  t.startAt = Date.now();
-  window.STATE.answerLocked = false;
-  window.STATE.lastAnswer = null;
+window.maybeCloseQuestionIfAllAnswered = function maybeCloseQuestionIfAllAnswered() {
+  const room = window.STATE.room;
+  if (!room || room.phase !== "QUESTION") return;
+  if (!window.STATE.isHost) return;
 
-  // tick para repintar el contador
-  if (window.__tickInterval) clearInterval(window.__tickInterval);
-  window.__tickInterval = setInterval(() => {
-    if (window.STATE.view !== "QUESTION") return;
-    const left = window.getTimeLeftMs();
-    window.render();
-    if (left <= 0) {
-      clearInterval(window.__tickInterval);
-      window.endQuestion();
-    }
-  }, 200);
-};
+  const expected = room.questionLockedPlayers || window.STATE.players.length;
+  const answered = window.STATE.answers.length;
 
-window.endQuestion = function endQuestion() {
-  window.STATE.timer.running = false;
-  window.STATE.answerLocked = true;
-  window.setView("REVEAL");
-};
-
-window.submitAnswerLocal = function submitAnswerLocal(idx) {
-  if (window.STATE.answerLocked) return;
-
-  window.STATE.answerLocked = true;
-  window.STATE.lastAnswer = idx;
-
-  const q = window.STATE.questions[window.STATE.currentIndex];
-  const left = Math.max(0, window.getTimeLeftMs());
-
-  // puntuación básica: 100 por acertar + bonus por tiempo
-  if (idx === q.correctIndex) {
-    const bonus = Math.floor(left / 100); // 0..150 aprox (si 15s)
-    window.STATE.player.score += 100 + bonus;
+  // Cierra si todos han respondido
+  if (answered >= expected) {
+    window.revealNow();
   }
-
-  window.endQuestion();
 };
 
-window.nextQuestion = function nextQuestion() {
-  window.STATE.currentIndex += 1;
-  if (window.STATE.currentIndex >= window.STATE.questions.length) {
-    window.setView("SCORES");
-    return;
+// Cierre por tiempo (lo hace el host, usando reloj sincronizado)
+setInterval(() => {
+  const room = window.STATE.room;
+  if (!room || room.phase !== "QUESTION") return;
+  if (!window.STATE.isHost) return;
+
+  if (window.getTimeLeftMs() <= 0) {
+    window.revealNow();
   }
-  window.setView("QUESTION");
-  window.startQuestionTimer();
-};
-
-window.restartGame = function restartGame() {
-  window.STATE.currentIndex = 0;
-  window.STATE.player.score = 0;
-  window.setView("HOME");
-};
+}, 200);

@@ -1,46 +1,45 @@
 // js/app.js
-function bindEvents() {
-  document.body.addEventListener("click", (e) => {
-    const target = e.target;
+document.addEventListener("click", async (e) => {
+  const t = e.target;
 
-    if (target.id === "goLobbyBtn") {
-      const nameInput = document.getElementById("nameInput");
-      window.STATE.player.name = (nameInput?.value || "Jugador").trim() || "Jugador";
-      window.setView("LOBBY");
-      return;
+  try {
+    if (t.id === "create") {
+      const name = document.getElementById("name").value.trim() || "Jugador";
+      window.STATE.name = name;
+      localStorage.setItem("playerName", name);
+      await window.createRoom();
     }
 
-    if (target.id === "backHomeBtn") {
-      window.setView("HOME");
-      return;
+    if (t.id === "join") {
+      const name = document.getElementById("name").value.trim() || "Jugador";
+      window.STATE.name = name;
+      localStorage.setItem("playerName", name);
+
+      const code = document.getElementById("code").value.trim().toUpperCase();
+      await window.joinRoom(code);
     }
 
-    if (target.id === "startBtn") {
-      window.STATE.currentIndex = 0;
-      window.setView("QUESTION");
-      window.startQuestionTimer();
-      return;
+    if (t.id === "start") {
+      await window.startQuestion();
     }
 
-    if (target.classList.contains("opt")) {
-      const idx = Number(target.dataset.idx);
-      window.submitAnswerLocal(idx);
-      return;
+    if (t.classList.contains("opt")) {
+      const idx = Number(t.dataset.i);
+      await window.submitAnswer(idx);
     }
 
-    if (target.id === "nextBtn") {
-      window.nextQuestion();
-      return;
+    if (t.id === "backLobby") {
+      // para simplificar: vuelve a lobby (podrías pasar a siguiente pregunta luego)
+      await firebase.firestore().collection("rooms").doc(window.STATE.roomCode).update({ phase: "LOBBY" });
     }
 
-    if (target.id === "restartBtn") {
-      window.restartGame();
-      return;
+    if (t.id === "home") {
+      location.reload(); // simple: resetea UI (ya lo haremos fino)
     }
-  });
-}
 
-window.addEventListener("load", () => {
-  bindEvents();
-  window.render();
+  } catch (err) {
+    alert(err.message || String(err));
+  }
 });
+
+window.addEventListener("load", () => window.setView("HOME"));

@@ -1,103 +1,67 @@
 // js/ui.js
 window.render = function render() {
   const app = document.getElementById("app");
-  if (!app) return;
+  const S = window.STATE;
 
-  const { view } = window.STATE;
-
-  if (view === "HOME") app.innerHTML = window.uiHome();
-  else if (view === "LOBBY") app.innerHTML = window.uiLobby();
-  else if (view === "QUESTION") app.innerHTML = window.uiQuestion();
-  else if (view === "REVEAL") app.innerHTML = window.uiReveal();
-  else if (view === "SCORES") app.innerHTML = window.uiScores();
-};
-
-window.uiHome = function uiHome() {
-  return `
-    <div class="screen">
+  if (S.view === "HOME") {
+    app.innerHTML = `
       <h1>Canarios Sabiondinchis 🧠🌋</h1>
-      <p>Modo local (por ahora). Luego metemos salas reales.</p>
-
-      <div class="card">
-        <label>Tu nombre</label>
-        <input id="nameInput" value="${window.STATE.player.name}" />
-        <button id="goLobbyBtn">Entrar al lobby</button>
+      <label>Nombre</label>
+      <input id="name" value="${S.name}">
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="create">Crear sala</button>
+        <input id="code" placeholder="Código sala" style="text-transform:uppercase;">
+        <button id="join">Unirse</button>
       </div>
-    </div>
-  `;
-};
+    `;
+    return;
+  }
 
-window.uiLobby = function uiLobby() {
-  const name = window.STATE.player.name;
-  return `
-    <div class="screen">
-      <h2>Lobby</h2>
-      <p>Jugador: <b>${name}</b></p>
+  if (S.view === "LOBBY") {
+    const players = S.players.map(p => `<li>${p.name}</li>`).join("");
+    app.innerHTML = `
+      <h2>Sala: ${S.roomCode}</h2>
+      <p>${S.isHost ? "Eres HOST" : "Eres jugador"}</p>
 
-      <div class="card">
-        <button id="startBtn">Iniciar partida</button>
+      <h3>Jugadores</h3>
+      <ul>${players}</ul>
+
+      ${S.isHost ? `<button id="start">Iniciar pregunta</button>` : `<p>Esperando a que el host inicie…</p>`}
+      <button id="home">Salir</button>
+    `;
+    return;
+  }
+
+  if (S.view === "QUESTION") {
+    const q = S.questions[S.room.questionIndex];
+    const left = Math.ceil(window.getTimeLeftMs() / 1000);
+    const already = S.answers.some(a => a.id === S.playerId);
+
+    app.innerHTML = `
+      <h2>⏱️ ${left}s</h2>
+      <h3>${q.text}</h3>
+      <div>
+        ${q.options.map((opt, i) => `
+          <button class="opt" data-i="${i}" ${already ? "disabled" : ""}>${opt}</button>
+        `).join("")}
       </div>
+      <p>Respondidas: ${S.answers.length} / ${S.room.questionLockedPlayers || S.players.length}</p>
+    `;
+    return;
+  }
 
-      <button id="backHomeBtn" class="link">Volver</button>
-    </div>
-  `;
-};
+  if (S.view === "REVEAL") {
+    const q = S.questions[S.room.questionIndex];
+    const my = S.answers.find(a => a.id === S.playerId);
+    const msg = my ? (my.isCorrect ? "✅ Acertaste" : "❌ Fallaste") : "No respondiste";
 
-window.uiQuestion = function uiQuestion() {
-  const q = window.STATE.questions[window.STATE.currentIndex];
-  const timeLeft = window.getTimeLeftMs();
-  const locked = window.STATE.answerLocked;
+    app.innerHTML = `
+      <h2>${msg}</h2>
+      <p><b>Correcta:</b> ${q.options[q.correctIndex]}</p>
+      <p>${q.info}</p>
 
-  const buttons = q.options
-    .map((opt, i) => {
-      const disabled = locked ? "disabled" : "";
-      return `<button class="opt" data-idx="${i}" ${disabled}>${opt}</button>`;
-    })
-    .join("");
-
-  return `
-    <div class="screen">
-      <div class="topbar">
-        <div class="pill">⏱️ ${Math.max(0, Math.ceil(timeLeft / 1000))}s</div>
-        <div class="pill">⭐ ${window.STATE.player.score}</div>
-      </div>
-
-      <div class="card">
-        <h2>${q.text}</h2>
-        <div class="opts">${buttons}</div>
-      </div>
-    </div>
-  `;
-};
-
-window.uiReveal = function uiReveal() {
-  const q = window.STATE.questions[window.STATE.currentIndex];
-  const chosen = window.STATE.lastAnswer;
-  const correct = q.correctIndex;
-
-  let resultText = "No respondiste.";
-  if (chosen !== null) resultText = chosen === correct ? "✅ Correcto" : "❌ Fallaste";
-
-  return `
-    <div class="screen">
-      <h2>${resultText}</h2>
-
-      <div class="card">
-        <p><b>Correcta:</b> ${q.options[correct]}</p>
-        <p>${q.info}</p>
-      </div>
-
-      <button id="nextBtn">Siguiente</button>
-    </div>
-  `;
-};
-
-window.uiScores = function uiScores() {
-  return `
-    <div class="screen">
-      <h2>Fin</h2>
-      <p>Puntuación: <b>${window.STATE.player.score}</b></p>
-      <button id="restartBtn">Reiniciar</button>
-    </div>
-  `;
+      ${S.isHost ? `<button id="backLobby">Volver al lobby</button>` : `<p>Esperando al host…</p>`}
+    `;
+    return;
+  }
 };
